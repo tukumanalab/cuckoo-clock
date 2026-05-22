@@ -11,12 +11,6 @@
     <h1>鳩時計ディスクジェネレーター</h1>
     <p class="subtitle">3Dプリント用 STL ファイルをダウンロードできます</p>
 
-    <!-- Mode toggle -->
-    <div class="mode-row">
-      <button class="mode-btn active" id="btnFixed">固定パターン（元の設計）</button>
-      <button class="mode-btn" id="btnMelody">メロディモード</button>
-    </div>
-
     <!-- Spec table (updated by JS) -->
     <table class="spec-table" id="specTable">
       <tr><th>扇形分割</th><td id="specSectors">25 等分</td></tr>
@@ -25,7 +19,7 @@
       <tr><th>中央穴</th><td>10.5 × 10.5 mm（正方形）</td></tr>
     </table>
 
-    <!-- Melody editor (shown only in melody mode) -->
+    <!-- Melody editor -->
     <div id="melody-editor">
       <div class="melody-header">
         <span class="melody-title" id="melodyTitle">♪ キラキラ星</span>

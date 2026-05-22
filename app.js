@@ -20,7 +20,6 @@ const NOTE_FREQ    = [440, 392, 330, 294, 262]; // A4 G4 E4 D4 C4 — for previe
 const DEFAULT_MELODY = [4,4,1,1,0, 0,1,-1,1,1, 2,2,3,3,4, -1,1,1,1,1, 2,2,3,-1,4];
 
 // ── State ────────────────────────────────────────────────
-let melodyMode = false;
 let melody = [...DEFAULT_MELODY];
 
 function noteSeqToRadii(noteSeq) {
@@ -32,7 +31,6 @@ function noteSeqToRadii(noteSeq) {
 }
 
 function getRadiiSeq() {
-  if (!melodyMode) return Array.from({length: 25}, (_, i) => RADII[i % 5]);
   return noteSeqToRadii(melody);
 }
 
@@ -103,12 +101,10 @@ function buildGeometry() {
   const gw = 1.0, gd = 1.5; // groove half-width / depth (mm)
   hole.moveTo(-HOLE_HALF, -HOLE_HALF);
   hole.lineTo(HOLE_HALF, -HOLE_HALF);
-  if (melodyMode) {
-    // V-groove on the +X wall of square hole marks sector 0 start
-    hole.lineTo(HOLE_HALF, -gw);
-    hole.lineTo(HOLE_HALF + gd, 0);
-    hole.lineTo(HOLE_HALF, gw);
-  }
+  // V-groove on the +X wall of square hole marks sector 0 start
+  hole.lineTo(HOLE_HALF, -gw);
+  hole.lineTo(HOLE_HALF + gd, 0);
+  hole.lineTo(HOLE_HALF, gw);
   hole.lineTo(HOLE_HALF, HOLE_HALF);
   hole.lineTo(-HOLE_HALF, HOLE_HALF);
   hole.closePath();
@@ -125,7 +121,9 @@ function buildGeometry() {
   edgeObj = new THREE.LineSegments(edgesGeo, new THREE.LineBasicMaterial({ color: 0x1e40af }));
   scene.add(edgeObj);
 }
+buildMelodyGrid();
 buildGeometry();
+updateSpec();
 
 window.addEventListener('resize', () => {
   const w = container.clientWidth, h = container.clientHeight;
@@ -230,9 +228,8 @@ function generateSTL(customSeq = null, addMarker = false) {
 }
 
 // ── Melody editor UI ─────────────────────────────────────
-const melodyGrid   = document.getElementById('melodyGrid');
-const noteLegend   = document.getElementById('noteLegend');
-const melodyEditor = document.getElementById('melody-editor');
+const melodyGrid = document.getElementById('melodyGrid');
+const noteLegend = document.getElementById('noteLegend');
 
 // Build legend
 NOTE_LABELS.forEach((label, idx) => {
@@ -289,39 +286,12 @@ function updateBeatBtn(btn, noteIdx) {
 
 // ── Spec table update ─────────────────────────────────────
 function updateSpec() {
-  const specSectors = document.getElementById('specSectors');
-  const specPattern = document.getElementById('specPattern');
-  if (!melodyMode) {
-    specSectors.textContent = '25 等分';
-    specPattern.textContent = 'φ40 → 37.5 → 35 → 32.5 → 30 mm × 5';
-  } else {
-    const usedNotes = [...new Set(melody.filter(n => n >= 0))].sort();
-    const noteNames = ['φ40(音1)','φ37.5(音2)','φ35(音3)','φ32.5(音4)','φ30(音5)'];
-    specSectors.textContent = `${melody.length} 等分`;
-    specPattern.textContent = usedNotes.map(n => noteNames[n]).join('・')
-      + (melody.includes(-1) ? '・休符あり' : '');
-  }
+  const usedNotes = [...new Set(melody.filter(n => n >= 0))].sort();
+  const noteNames = ['φ40(ラ)','φ37.5(ソ)','φ35(ミ)','φ32.5(レ)','φ30(ド)'];
+  document.getElementById('specSectors').textContent = `${melody.length} 等分`;
+  document.getElementById('specPattern').textContent =
+    usedNotes.map(n => noteNames[n]).join('・');
 }
-
-// ── Mode toggle ───────────────────────────────────────────
-document.getElementById('btnFixed').addEventListener('click', () => {
-  melodyMode = false;
-  document.getElementById('btnFixed').classList.add('active');
-  document.getElementById('btnMelody').classList.remove('active');
-  melodyEditor.style.display = 'none';
-  buildGeometry();
-  updateSpec();
-});
-
-document.getElementById('btnMelody').addEventListener('click', () => {
-  melodyMode = true;
-  document.getElementById('btnMelody').classList.add('active');
-  document.getElementById('btnFixed').classList.remove('active');
-  buildMelodyGrid();
-  melodyEditor.style.display = '';
-  buildGeometry();
-  updateSpec();
-});
 
 // ── Audio preview ─────────────────────────────────────────
 let audioCtx = null;
@@ -370,7 +340,7 @@ function downloadSTL(stl, filename) {
 
 document.getElementById('downloadBtn').addEventListener('click', () => {
   const name = melodyMode ? 'melody_disk.stl' : 'disk_25sectors_stepped.stl';
-  downloadSTL(generateSTL(null, melodyMode), name);
+  downloadSTL(generateSTL(null, true), name);
 });
 
 // Single-note test disks: all 25 sectors at one radius

@@ -19,15 +19,6 @@ body {
 h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 .subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 20px; }
 
-/* Mode toggle */
-.mode-row { display: flex; gap: 8px; margin-bottom: 20px; }
-.mode-btn {
-  flex: 1; padding: 10px;
-  border: 2px solid #e2e8f0; background: #f8fafc;
-  color: #64748b; font-size: 0.875rem; font-weight: 600;
-  cursor: pointer; border-radius: 8px; transition: all 0.15s;
-}
-.mode-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
 
 /* Spec table */
 .spec-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -37,7 +28,7 @@ h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 .spec-table tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
 /* Melody editor */
-#melody-editor { display: none; margin-bottom: 20px; }
+#melody-editor { margin-bottom: 20px; }
 .melody-header {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 10px;
