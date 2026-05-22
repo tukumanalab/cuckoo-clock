@@ -238,6 +238,12 @@ buildPianoRoll();
 // ── Audio preview ─────────────────────────────────────────
 let audioCtx = null;
 
+document.getElementById('clearBtn').addEventListener('click', () => {
+  melody.fill(-1);
+  refreshPianoRoll();
+  buildGeometry();
+});
+
 document.getElementById('playBtn').addEventListener('click', () => {
   audioCtx ??= new AudioContext();
   const bpm = 150, beat = 60 / bpm, now = audioCtx.currentTime + 0.05;
