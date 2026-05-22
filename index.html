@@ -11,24 +11,15 @@
     <h1>鳩時計ディスクジェネレーター</h1>
     <p class="subtitle">3Dプリント用 STL ファイルをダウンロードできます</p>
 
-    <!-- Spec table (updated by JS) -->
-    <table class="spec-table" id="specTable">
-      <tr><th>扇形分割</th><td id="specSectors">25 等分</td></tr>
-      <tr><th>外径パターン</th><td id="specPattern">φ40 → 37.5 → 35 → 32.5 → 30 mm × 5</td></tr>
-      <tr><th>厚さ</th><td>1.8 mm</td></tr>
-      <tr><th>中央穴</th><td>10.5 × 10.5 mm（正方形）</td></tr>
-    </table>
-
     <!-- Melody editor -->
     <div id="melody-editor">
       <div class="melody-header">
         <span class="melody-title" id="melodyTitle">♪ キラキラ星</span>
         <button class="play-btn" id="playBtn">▶ 試聴</button>
       </div>
-      <div class="melody-grid" id="melodyGrid"></div>
-      <div class="note-legend" id="noteLegend"></div>
+      <div id="piano-roll"></div>
       <p style="font-size:0.72rem; color:#94a3b8; margin-bottom:8px;">
-        ボタンをクリックして音を変更。「休」は最高音（φ40mm）として出力されます。
+        セルをクリックして音を選択。別のセルをクリックするとそのビートの音が変わります。
       </p>
     </div>
 

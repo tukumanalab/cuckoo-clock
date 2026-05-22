@@ -2,32 +2,44 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // ── Constants ────────────────────────────────────────────
-const RADII     = [20, 18.75, 17.5, 16.25, 15]; // note 0(high)→4(low), mm radius
-const REST_R    = RADII[0]; // rest: use highest-note radius (φ40mm) so every sector engages
+// 12 chromatic notes, index 0 (最高: シ) → 11 (最低: ド)
+// シ/ラ# は φ40mm に頭打ち（物理的な上限）
+// 中間音のラジアスは既知5点間を半音ベースで線形補間
+const RADII = [
+  20,      // 0: シ   B4  (≒ラ, capped at φ40)
+  20,      // 1: ラ#  Bb4 (≒ラ, capped at φ40)
+  20,      // 2: ラ   A4  φ40mm
+  19.375,  // 3: ソ#  Ab4 φ38.75mm
+  18.75,   // 4: ソ   G4  φ37.5mm
+  18.333,  // 5: ファ# F#4 φ36.67mm
+  17.917,  // 6: ファ  F4  φ35.83mm
+  17.5,    // 7: ミ   E4  φ35mm
+  16.875,  // 8: レ#  Eb4 φ33.75mm
+  16.25,   // 9: レ   D4  φ32.5mm
+  15.625,  // 10:ド#  Db4 φ31.25mm
+  15,      // 11:ド   C4  φ30mm
+];
+const REST_R    = RADII[0]; // kept for compatibility
 const HOLE_HALF = 5.25;
 const THICKNESS = 1.8;
 const SUB       = 8;
 
-// Note meta (index 0=highest/φ40 … 4=lowest/φ30)
-const NOTE_COLORS  = ['#ef4444','#f97316','#84cc16','#06b6d4','#8b5cf6','#cbd5e1'];
-const NOTE_LABELS  = ['ラ（高）','ソ','ミ','レ','ド（低）','休'];
-const NOTE_SOLFEGE = ['ラ','ソ','ミ','レ','ド'];
-const NOTE_FREQ    = [440, 392, 330, 294, 262]; // A4 G4 E4 D4 C4 — for preview
+const NOTE_COLORS = [
+  '#ec4899','#f43f5e','#ef4444','#f97316','#fb923c','#eab308',
+  '#a3e635','#84cc16','#22c55e','#06b6d4','#3b82f6','#8b5cf6',
+];
+const NOTE_SOLFEGE = ['シ','ラ#','ラ','ソ#','ソ','ファ#','ファ','ミ','レ#','レ','ド#','ド'];
+const NOTE_FREQ    = [494, 466, 440, 415, 392, 370, 349, 330, 311, 294, 277, 262]; // Hz
 
-// "キラキラ星" 25 beats (ペンタトニック: ファなし、ファ→ソに置換)
-//  note indices: 0=ラ(φ40) 1=ソ(φ37.5) 2=ミ(φ35) 3=レ(φ32.5) 4=ド(φ30) -1=rest
-//  ド ド ソ ソ ラ | ラ ソ 休 ソ ソ | ミ ミ レ レ ド | 休 ソ ソ ソ ソ | ミ ミ レ 休 ド
-const DEFAULT_MELODY = [4,4,1,1,0, 0,1,-1,1,1, 2,2,3,3,4, -1,1,1,1,1, 2,2,3,-1,4];
+// "キラキラ星" 25 beats (no rests, 25 sectors)
+//  ド ド ソ ソ ラ ラ ソ ソ | ファ ファ ミ ミ レ レ ド ド | ソ ソ ファ ファ ミ ミ レ レ ド
+const DEFAULT_MELODY = [11,11,4,4,2,2,4,4, 6,6,7,7,9,9,11,11, 4,4,6,6,7,7,9,9,11];
 
 // ── State ────────────────────────────────────────────────
 let melody = [...DEFAULT_MELODY];
 
 function noteSeqToRadii(noteSeq) {
-  let lastR = REST_R;
-  return noteSeq.map(n => {
-    if (n >= 0) lastR = RADII[n];
-    return lastR; // rest repeats the previous note's radius
-  });
+  return noteSeq.map(n => RADII[n] ?? REST_R);
 }
 
 function getRadiiSeq() {
@@ -121,9 +133,7 @@ function buildGeometry() {
   edgeObj = new THREE.LineSegments(edgesGeo, new THREE.LineBasicMaterial({ color: 0x1e40af }));
   scene.add(edgeObj);
 }
-buildMelodyGrid();
 buildGeometry();
-updateSpec();
 
 window.addEventListener('resize', () => {
   const w = container.clientWidth, h = container.clientHeight;
@@ -227,71 +237,61 @@ function generateSTL(customSeq = null, addMarker = false) {
   return lines.join('\n');
 }
 
-// ── Melody editor UI ─────────────────────────────────────
-const melodyGrid = document.getElementById('melodyGrid');
-const noteLegend = document.getElementById('noteLegend');
+// ── Piano Roll UI ─────────────────────────────────────────
+const pianoRoll = document.getElementById('piano-roll');
+let prCells = []; // prCells[noteRow * melody.length + beatCol]
 
-// Build legend
-NOTE_LABELS.forEach((label, idx) => {
-  const item = document.createElement('div');
-  item.className = 'legend-item';
-  const dot = document.createElement('div');
-  dot.className = 'legend-dot';
-  dot.style.background = NOTE_COLORS[idx < 5 ? idx : 5];
-  item.appendChild(dot);
-  item.appendChild(document.createTextNode(label));
-  noteLegend.appendChild(item);
-});
+function buildPianoRoll() {
+  pianoRoll.innerHTML = '';
+  prCells = [];
+  pianoRoll.style.gridTemplateColumns = `48px repeat(${melody.length}, 1fr)`;
 
-let beatBtns = [];
-
-function buildMelodyGrid() {
-  melodyGrid.innerHTML = '';
-  beatBtns = [];
-  melody.forEach((n, i) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'beat-wrap';
+  // Header: empty top-left + beat numbers
+  pianoRoll.appendChild(document.createElement('div'));
+  for (let b = 0; b < melody.length; b++) {
     const num = document.createElement('div');
-    num.className = 'beat-num';
-    num.textContent = i + 1;
-    const btn = document.createElement('button');
-    btn.className = 'note-btn';
-    updateBeatBtn(btn, n);
-    btn.addEventListener('click', () => {
-      // cycle: 0→1→2→3→4→-1→0
-      let cur = melody[i];
-      melody[i] = cur < 0 ? 0 : (cur >= 4 ? -1 : cur + 1);
-      updateBeatBtn(btn, melody[i]);
-      buildGeometry();
-      updateSpec();
-    });
-    wrap.appendChild(num);
-    wrap.appendChild(btn);
-    melodyGrid.appendChild(wrap);
-    beatBtns.push(btn);
-  });
+    num.className = 'pr-beat-num';
+    num.textContent = b + 1;
+    pianoRoll.appendChild(num);
+  }
+
+  // Note rows (high → low)
+  for (let n = 0; n < NOTE_SOLFEGE.length; n++) {
+    const key = document.createElement('div');
+    key.className = 'pr-key';
+    key.style.background = NOTE_COLORS[n];
+    key.textContent = NOTE_SOLFEGE[n];
+    pianoRoll.appendChild(key);
+
+    for (let b = 0; b < melody.length; b++) {
+      const cell = document.createElement('div');
+      cell.className = 'pr-cell';
+      cell.dataset.beat = b;
+      cell.dataset.note = n;
+      cell.addEventListener('click', () => {
+        melody[b] = n; // always set; no rest
+        refreshPianoRoll();
+        buildGeometry();
+      });
+      pianoRoll.appendChild(cell);
+      prCells.push(cell);
+    }
+  }
+
+  refreshPianoRoll();
 }
 
-function updateBeatBtn(btn, noteIdx) {
-  if (noteIdx < 0) {
-    btn.style.background = NOTE_COLORS[5];
-    btn.textContent = '休';
-    btn.classList.add('rest-note');
-  } else {
-    btn.style.background = NOTE_COLORS[noteIdx];
-    btn.textContent = NOTE_SOLFEGE[noteIdx];
-    btn.classList.remove('rest-note');
+function refreshPianoRoll() {
+  const N = NOTE_SOLFEGE.length;
+  for (let n = 0; n < N; n++) {
+    for (let b = 0; b < melody.length; b++) {
+      const cell = prCells[n * melody.length + b];
+      cell.style.background = (melody[b] === n) ? NOTE_COLORS[n] : '#dde3ec';
+    }
   }
 }
 
-// ── Spec table update ─────────────────────────────────────
-function updateSpec() {
-  const usedNotes = [...new Set(melody.filter(n => n >= 0))].sort();
-  const noteNames = ['φ40(ラ)','φ37.5(ソ)','φ35(ミ)','φ32.5(レ)','φ30(ド)'];
-  document.getElementById('specSectors').textContent = `${melody.length} 等分`;
-  document.getElementById('specPattern').textContent =
-    usedNotes.map(n => noteNames[n]).join('・');
-}
+buildPianoRoll();
 
 // ── Audio preview ─────────────────────────────────────────
 let audioCtx = null;
@@ -322,7 +322,7 @@ document.getElementById('playBtn').addEventListener('click', () => {
   const btn   = document.getElementById('playBtn');
   btn.disabled = true;
   melody.forEach((n, i) => {
-    if (n >= 0) playNote(n, now + i * beat, beat * 0.85);
+    playNote(n, now + i * beat, beat * 0.85);
   });
   setTimeout(() => { btn.disabled = false; }, melody.length * beat * 1000 + 200);
 });
@@ -339,15 +339,11 @@ function downloadSTL(stl, filename) {
 }
 
 document.getElementById('downloadBtn').addEventListener('click', () => {
-  const name = melodyMode ? 'melody_disk.stl' : 'disk_25sectors_stepped.stl';
-  downloadSTL(generateSTL(null, true), name);
+  downloadSTL(generateSTL(null, true), 'melody_disk.stl');
 });
 
 // Single-note test disks: all 25 sectors at one radius
 document.getElementById('dlTwinkle').addEventListener('click', () => {
-  // キラキラ星: ド ド ソ ソ ラ ラ ソ 休 | ソ ソ ミ ミ レ レ ド 休 | ソ ソ ソ ソ ミ ミ レ 休
-  const twinkle = [4,4,1,1,0,0,1,-1, 1,1,2,2,3,3,4,-1, 1,1,1,1,2,2,3,-1];
-  const seq = noteSeqToRadii(twinkle);
-  downloadSTL(generateSTL(seq, true), 'disk_twinkle_star.stl');
+  downloadSTL(generateSTL(noteSeqToRadii(DEFAULT_MELODY), true), 'disk_twinkle_star.stl');
 });
 

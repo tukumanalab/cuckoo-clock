@@ -13,19 +13,12 @@ body {
   border-radius: 16px;
   box-shadow: 0 4px 32px rgba(0,0,0,0.10);
   padding: 36px 40px;
-  max-width: 540px;
+  max-width: 720px;
   width: 100%;
 }
 h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 .subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 20px; }
 
-
-/* Spec table */
-.spec-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-.spec-table th, .spec-table td { padding: 9px 12px; text-align: left; font-size: 0.9rem; }
-.spec-table th { color: #94a3b8; font-weight: 500; width: 42%; }
-.spec-table td { color: #1e293b; font-weight: 600; }
-.spec-table tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
 /* Melody editor */
 #melody-editor { margin-bottom: 20px; }
@@ -44,34 +37,32 @@ h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 .play-btn:hover { background: #059669; }
 .play-btn:disabled { background: #94a3b8; cursor: default; }
 
-.melody-grid {
+/* Piano roll */
+#piano-roll {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
+  /* grid-template-columns set dynamically in JS */
+  gap: 2px;
   margin-bottom: 10px;
 }
-.beat-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.beat-num { font-size: 0.6rem; color: #94a3b8; }
-.note-btn {
-  width: 100%; aspect-ratio: 1;
-  border: none; border-radius: 6px;
-  font-size: 0.75rem; font-weight: 700;
-  cursor: pointer; color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
-  transition: transform 0.08s, opacity 0.1s;
+.pr-beat-num {
+  font-size: 0.55rem; color: #94a3b8;
+  text-align: center; line-height: 1.4;
 }
-.note-btn:hover { opacity: 0.85; }
-.note-btn:active { transform: scale(0.92); }
-
-.note-legend {
-  display: flex; gap: 8px; flex-wrap: wrap;
-  font-size: 0.72rem; color: #64748b;
-  margin-bottom: 6px;
+.pr-key {
+  border-radius: 4px;
+  font-size: 0.7rem; font-weight: 700; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  display: flex; align-items: center; justify-content: center;
+  height: 20px; padding: 2px;
 }
-.legend-item { display: flex; align-items: center; gap: 4px; }
-.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-.rest-note { font-size: 0.6rem !important; }
+.pr-cell {
+  height: 20px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: opacity 0.1s, transform 0.06s;
+}
+.pr-cell:hover { opacity: 0.7; }
+.pr-cell:active { transform: scale(0.88); }
 
 /* Preview */
 #preview-container {
