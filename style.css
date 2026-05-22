@@ -124,6 +124,3 @@ h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 }
 .single-btn:hover  { opacity: 0.85; }
 .single-btn:active { opacity: 0.7; }
-.high-btn { background: #ef4444; }
-.mid-btn  { background: #84cc16; }
-.low-btn  { background: #8b5cf6; }

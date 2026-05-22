@@ -381,17 +381,3 @@ document.getElementById('dlTwinkle').addEventListener('click', () => {
   downloadSTL(generateSTL(seq, true), 'disk_twinkle_star.stl');
 });
 
-document.getElementById('dlHigh').addEventListener('click', () => {
-  const seq = Array(25).fill(RADII[0]); // φ40mm
-  downloadSTL(generateSTL(seq), 'disk_single_high_40mm.stl');
-});
-
-document.getElementById('dlMid').addEventListener('click', () => {
-  const seq = Array(25).fill(RADII[2]); // φ35mm
-  downloadSTL(generateSTL(seq), 'disk_single_mid_35mm.stl');
-});
-
-document.getElementById('dlLow').addEventListener('click', () => {
-  const seq = Array(25).fill(RADII[4]); // φ30mm
-  downloadSTL(generateSTL(seq), 'disk_single_low_30mm.stl');
-});
