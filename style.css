@@ -84,25 +84,3 @@ h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 #downloadBtn:hover  { background: #1d4ed8; }
 #downloadBtn:active { background: #1e40af; }
 
-/* Single-note test disks */
-.single-note-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #f1f5f9;
-}
-.single-note-title {
-  font-size: 0.78rem;
-  color: #94a3b8;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-.single-note-row { display: flex; gap: 8px; }
-.single-btn {
-  flex: 1; padding: 10px 8px;
-  border: none; border-radius: 8px;
-  font-size: 0.82rem; font-weight: 600;
-  cursor: pointer; color: #fff;
-  transition: opacity 0.15s;
-}
-.single-btn:hover  { opacity: 0.85; }
-.single-btn:active { opacity: 0.7; }

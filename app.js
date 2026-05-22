@@ -28,15 +28,19 @@ const NOTE_COLORS = [
 const NOTE_SOLFEGE = ['ラ','ソ#','ソ','ファ#','ファ','ミ','レ#','レ','ド#','ド'];
 const NOTE_FREQ    = [440, 415, 392, 370, 349, 330, 311, 294, 277, 262]; // Hz
 
-// "キラキラ星" 25 beats (no rests, 25 sectors)
-//  ド ド ソ ソ ラ ラ ソ ソ | ファ ファ ミ ミ レ レ ド ド | ソ ソ ファ ファ ミ ミ レ レ ド
-const DEFAULT_MELODY = [9,9,2,2,0,0,2,2, 4,4,5,5,7,7,9,9, 2,2,4,4,5,5,7,7,9];
+// "キラキラ星" 25 beats, last beat is rest (repeats previous note in STL)
+//  ド ド ソ ソ ラ ラ ソ ソ | ファ ファ ミ ミ レ レ ド ド | ソ ソ ファ ファ ミ ミ レ レ 休
+const DEFAULT_MELODY = [9,9,2,2,0,0,2,2, 4,4,5,5,7,7,9,9, 2,2,4,4,5,5,7,7,-1];
 
 // ── State ────────────────────────────────────────────────
 let melody = [...DEFAULT_MELODY];
 
 function noteSeqToRadii(noteSeq) {
-  return noteSeq.map(n => RADII[n] ?? REST_R);
+  let lastR = REST_R;
+  return noteSeq.map(n => {
+    if (n >= 0) lastR = RADII[n];
+    return lastR; // rest (-1) repeats the previous note's radius
+  });
 }
 
 function getRadiiSeq() {
@@ -266,7 +270,7 @@ function buildPianoRoll() {
       cell.dataset.beat = b;
       cell.dataset.note = n;
       cell.addEventListener('click', () => {
-        melody[b] = n; // always set; no rest
+        melody[b] = (melody[b] === n) ? -1 : n; // toggle: active→rest, inactive→set
         refreshPianoRoll();
         buildGeometry();
       });
@@ -339,8 +343,4 @@ document.getElementById('downloadBtn').addEventListener('click', () => {
   downloadSTL(generateSTL(null, true), 'melody_disk.stl');
 });
 
-// Single-note test disks: all 25 sectors at one radius
-document.getElementById('dlTwinkle').addEventListener('click', () => {
-  downloadSTL(generateSTL(noteSeqToRadii(DEFAULT_MELODY), true), 'disk_twinkle_star.stl');
-});
 
