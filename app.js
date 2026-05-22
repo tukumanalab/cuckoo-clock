@@ -14,10 +14,10 @@ const NOTE_LABELS  = ['ラ（高）','ソ','ミ','レ','ド（低）','休'];
 const NOTE_SOLFEGE = ['ラ','ソ','ミ','レ','ド'];
 const NOTE_FREQ    = [440, 392, 330, 294, 262]; // A4 G4 E4 D4 C4 — for preview
 
-// "キラキラ星" 24 beats (ペンタトニック: ファなし、ファ→ソに置換)
+// "キラキラ星" 25 beats (ペンタトニック: ファなし、ファ→ソに置換)
 //  note indices: 0=ラ(φ40) 1=ソ(φ37.5) 2=ミ(φ35) 3=レ(φ32.5) 4=ド(φ30) -1=rest
-//  ド ド ソ ソ ラ ラ ソ 休 | ソ ソ ミ ミ レ レ ド 休 | ソ ソ ソ ソ ミ ミ レ 休
-const DEFAULT_MELODY = [4,4,1,1,0,0,1,-1, 1,1,2,2,3,3,4,-1, 1,1,1,1,2,2,3,-1];
+//  ド ド ソ ソ ラ | ラ ソ 休 ソ ソ | ミ ミ レ レ ド | 休 ソ ソ ソ ソ | ミ ミ レ 休 ド
+const DEFAULT_MELODY = [4,4,1,1,0, 0,1,-1,1,1, 2,2,3,3,4, -1,1,1,1,1, 2,2,3,-1,4];
 
 // ── State ────────────────────────────────────────────────
 let melodyMode = false;
@@ -297,7 +297,7 @@ function updateSpec() {
   } else {
     const usedNotes = [...new Set(melody.filter(n => n >= 0))].sort();
     const noteNames = ['φ40(音1)','φ37.5(音2)','φ35(音3)','φ32.5(音4)','φ30(音5)'];
-    specSectors.textContent = `${melody.length} ビート`;
+    specSectors.textContent = `${melody.length} 等分`;
     specPattern.textContent = usedNotes.map(n => noteNames[n]).join('・')
       + (melody.includes(-1) ? '・休符あり' : '');
   }
