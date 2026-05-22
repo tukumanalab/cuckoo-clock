@@ -10,7 +10,8 @@ const SUB       = 8;
 
 // Note meta (index 0=highest/φ40 … 4=lowest/φ30)
 const NOTE_COLORS  = ['#ef4444','#f97316','#84cc16','#06b6d4','#8b5cf6','#cbd5e1'];
-const NOTE_LABELS  = ['音1(高)','音2','音3','音4','音5(低)','休'];
+const NOTE_LABELS  = ['ラ（高）','ソ','ミ','レ','ド（低）','休'];
+const NOTE_SOLFEGE = ['ラ','ソ','ミ','レ','ド'];
 const NOTE_FREQ    = [440, 392, 330, 294, 262]; // A4 G4 E4 D4 C4 — for preview
 
 // "キラキラ星" 24 beats (ペンタトニック: ファなし、ファ→ソに置換)
@@ -281,7 +282,7 @@ function updateBeatBtn(btn, noteIdx) {
     btn.classList.add('rest-note');
   } else {
     btn.style.background = NOTE_COLORS[noteIdx];
-    btn.textContent = noteIdx + 1;
+    btn.textContent = NOTE_SOLFEGE[noteIdx];
     btn.classList.remove('rest-note');
   }
 }
