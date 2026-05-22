@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>オルゴールディスク STL ジェネレーター</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="card">
+    <h1>オルゴールディスク STL ジェネレーター</h1>
+    <p class="subtitle">3Dプリント用 STL ファイルをダウンロードできます</p>
+
+    <!-- Mode toggle -->
+    <div class="mode-row">
+      <button class="mode-btn active" id="btnFixed">固定パターン（元の設計）</button>
+      <button class="mode-btn" id="btnMelody">メロディモード</button>
+    </div>
+
+    <!-- Spec table (updated by JS) -->
+    <table class="spec-table" id="specTable">
+      <tr><th>扇形分割</th><td id="specSectors">25 等分</td></tr>
+      <tr><th>外径パターン</th><td id="specPattern">φ40 → 37.5 → 35 → 32.5 → 30 mm × 5</td></tr>
+      <tr><th>厚さ</th><td>1.8 mm</td></tr>
+      <tr><th>中央穴</th><td>10.5 × 10.5 mm（正方形）</td></tr>
+    </table>
+
+    <!-- Melody editor (shown only in melody mode) -->
+    <div id="melody-editor">
+      <div class="melody-header">
+        <span class="melody-title" id="melodyTitle">♪ キラキラ星</span>
+        <button class="play-btn" id="playBtn">▶ 試聴</button>
+      </div>
+      <div class="melody-grid" id="melodyGrid"></div>
+      <div class="note-legend" id="noteLegend"></div>
+      <p style="font-size:0.72rem; color:#94a3b8; margin-bottom:8px;">
+        ボタンをクリックして音を変更。「休」は最高音（φ40mm）として出力されます。
+      </p>
+    </div>
+
+    <div id="preview-container"></div>
+    <p class="preview-hint">ドラッグで回転 · スクロールでズーム</p>
+
+    <button id="downloadBtn">STL をダウンロード</button>
+
+    <div class="single-note-section">
+      <div class="single-note-title">メロディディスク</div>
+      <div class="single-note-row">
+        <button class="single-btn" id="dlTwinkle" style="background:#f59e0b;">★ キラキラ星 STL</button>
+      </div>
+    </div>
+
+    <div class="single-note-section">
+      <div class="single-note-title">単音テスト用ディスク</div>
+      <div class="single-note-row">
+        <button class="single-btn high-btn" id="dlHigh">φ40mm（最高音）STL</button>
+        <button class="single-btn mid-btn"  id="dlMid" >φ35mm（中間音）STL</button>
+        <button class="single-btn low-btn"  id="dlLow" >φ30mm（最低音）STL</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
