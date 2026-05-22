@@ -22,9 +22,17 @@ const DEFAULT_MELODY = [4,4,1,1,0,0,1,-1, 1,1,2,2,3,3,4,-1, 1,1,1,1,2,2,3,-1];
 let melodyMode = false;
 let melody = [...DEFAULT_MELODY];
 
+function noteSeqToRadii(noteSeq) {
+  let lastR = REST_R;
+  return noteSeq.map(n => {
+    if (n >= 0) lastR = RADII[n];
+    return lastR; // rest repeats the previous note's radius
+  });
+}
+
 function getRadiiSeq() {
   if (!melodyMode) return Array.from({length: 25}, (_, i) => RADII[i % 5]);
-  return melody.map(n => n < 0 ? REST_R : RADII[n]);
+  return noteSeqToRadii(melody);
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -368,7 +376,7 @@ document.getElementById('downloadBtn').addEventListener('click', () => {
 document.getElementById('dlTwinkle').addEventListener('click', () => {
   // キラキラ星: ド ド ソ ソ ラ ラ ソ 休 | ソ ソ ミ ミ レ レ ド 休 | ソ ソ ソ ソ ミ ミ レ 休
   const twinkle = [4,4,1,1,0,0,1,-1, 1,1,2,2,3,3,4,-1, 1,1,1,1,2,2,3,-1];
-  const seq = twinkle.map(n => n < 0 ? REST_R : RADII[n]);
+  const seq = noteSeqToRadii(twinkle);
   downloadSTL(generateSTL(seq, true), 'disk_twinkle_star.stl');
 });
 
