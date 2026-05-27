@@ -68,11 +68,18 @@ controls.minDistance = 20;
 controls.maxDistance = 200;
 controls.update();
 
-let meshObj = null, edgeObj = null;
+let meshObj = null, edgeObj = null, markerObj = null;
+
+// 表面マーカー用パラメータ（正三角形の突起）
+const MRK_MS = 1.5;                        // 半辺長 mm（辺長 3mm）
+const MRK_MH = MRK_MS * Math.sqrt(3);      // 三角形の高さ
+const MRK_CY = HOLE_HALF + 2.5;            // 中心 Y 座標（穴の上方）
+const MRK_RH = 0.4;                        // 突起高さ mm
 
 function buildGeometry() {
-  if (meshObj) { scene.remove(meshObj); meshObj.geometry.dispose(); }
-  if (edgeObj) { scene.remove(edgeObj); edgeObj.geometry.dispose(); }
+  if (meshObj)  { scene.remove(meshObj);  meshObj.geometry.dispose(); }
+  if (edgeObj)  { scene.remove(edgeObj);  edgeObj.geometry.dispose(); }
+  if (markerObj){ scene.remove(markerObj);markerObj.geometry.dispose(); }
 
   const seq = melodyToRadii();
   const N = seq.length;
@@ -103,10 +110,23 @@ function buildGeometry() {
 
   const geo = new THREE.ExtrudeGeometry(shape, { depth: THICKNESS, bevelEnabled: false });
   geo.computeVertexNormals();
-  meshObj = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x7ab4d0, metalness: 0.25, roughness: 0.4 }));
+  const mat = new THREE.MeshStandardMaterial({ color: 0x7ab4d0, metalness: 0.25, roughness: 0.4 });
+  meshObj = new THREE.Mesh(geo, mat);
   scene.add(meshObj);
   edgeObj = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 18), new THREE.LineBasicMaterial({ color: 0x1e40af }));
   scene.add(edgeObj);
+
+  // 表面マーカー：正三角形の突起（△、+Y 方向が頂点）
+  const mShape = new THREE.Shape();
+  mShape.moveTo(-MRK_MS, MRK_CY - MRK_MH / 3);
+  mShape.lineTo( MRK_MS, MRK_CY - MRK_MH / 3);
+  mShape.lineTo(0,       MRK_CY + 2 * MRK_MH / 3);
+  mShape.closePath();
+  const mGeo = new THREE.ExtrudeGeometry(mShape, { depth: MRK_RH, bevelEnabled: false });
+  mGeo.computeVertexNormals();
+  markerObj = new THREE.Mesh(mGeo, mat);
+  markerObj.position.z = THICKNESS;
+  scene.add(markerObj);
 }
 buildGeometry();
 
@@ -182,6 +202,16 @@ function generateSTL() {
   facet([0,-1,0], [ h, h,t], [-h, h,t], [-h, h,0]);
   facet([0, 1,0], [-h,-h,0], [-h,-h,t], [ h,-h,0]);
   facet([0, 1,0], [-h,-h,t], [ h,-h,t], [ h,-h,0]);
+
+  // 表面マーカー：正三角形の突起（△）
+  const ms = MRK_MS, mh = MRK_MH, mcy = MRK_CY, mr = MRK_RH;
+  const BL  = [-ms, mcy - mh/3,    t     ], BR  = [ms, mcy - mh/3,    t     ], TT  = [0, mcy + 2*mh/3, t     ];
+  const BL2 = [-ms, mcy - mh/3,    t + mr], BR2 = [ms, mcy - mh/3,    t + mr], TT2 = [0, mcy + 2*mh/3, t + mr];
+  const s3 = Math.sqrt(3) / 2; // sin60°
+  facet([0,-1,0],     BL,  BR,  BR2);   facet([0,-1,0],     BL,  BR2, BL2);
+  facet([s3, 0.5, 0], BR,  TT,  TT2);   facet([s3, 0.5, 0], BR,  TT2, BR2);
+  facet([-s3,0.5, 0], TT,  BL,  BL2);   facet([-s3,0.5, 0], TT,  BL2, TT2);
+  facet([0, 0, 1],    BL2, BR2, TT2);
 
   lines.push('endsolid disk');
   return lines.join('\n');
