@@ -46,8 +46,8 @@ container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(36, container.clientWidth / container.clientHeight, 0.1, 1000);
-camera.position.set(35, 42, 48);
-camera.lookAt(0, 0, 1);
+camera.position.set(35, 42, -48);
+camera.lookAt(0, 0, 0);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -63,24 +63,22 @@ scene.add(rimLight);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
-controls.target.set(0, 0, 1);
+controls.target.set(0, 0, 0);
 controls.minDistance = 20;
 controls.maxDistance = 200;
 controls.update();
 
-let meshObj = null, edgeObj = null, markerObj = null, frontMarkerObj = null;
+let meshObj = null, edgeObj = null, frontMarkerObj = null;
 
-// マーカー用パラメータ（正三角形の突起）
+// 表面マーカー用パラメータ（正三角形の突起）
 const MRK_MS = 1.5;                        // 半辺長 mm（辺長 3mm）
 const MRK_MH = MRK_MS * Math.sqrt(3);      // 三角形の高さ
-const MRK_CY = HOLE_HALF + 2.5;            // 裏面マーカー中心 Y 座標（穴の上方）
-const MRK_CX = HOLE_HALF + 2.5;            // 表面マーカー中心 X 座標（V字溝と同方向）
+const MRK_CX = HOLE_HALF + 2.5;            // 表面マーカー中心 X 座標
 const MRK_RH = 0.4;                        // 突起高さ mm
 
 function buildGeometry() {
-  if (meshObj)      { scene.remove(meshObj);      meshObj.geometry.dispose(); }
-  if (edgeObj)      { scene.remove(edgeObj);      edgeObj.geometry.dispose(); }
-  if (markerObj)    { scene.remove(markerObj);    markerObj.geometry.dispose(); }
+  if (meshObj)        { scene.remove(meshObj);        meshObj.geometry.dispose(); }
+  if (edgeObj)        { scene.remove(edgeObj);        edgeObj.geometry.dispose(); }
   if (frontMarkerObj) { scene.remove(frontMarkerObj); frontMarkerObj.geometry.dispose(); }
 
   const seq = melodyToRadii();
@@ -99,12 +97,8 @@ function buildGeometry() {
   shape.closePath();
 
   const hole = new THREE.Path();
-  const gw = 1.0, gd = 1.5;
   hole.moveTo(-HOLE_HALF, -HOLE_HALF);
   hole.lineTo( HOLE_HALF, -HOLE_HALF);
-  hole.lineTo( HOLE_HALF, -gw);
-  hole.lineTo( HOLE_HALF + gd, 0);
-  hole.lineTo( HOLE_HALF,  gw);
   hole.lineTo( HOLE_HALF,  HOLE_HALF);
   hole.lineTo(-HOLE_HALF,  HOLE_HALF);
   hole.closePath();
@@ -118,19 +112,7 @@ function buildGeometry() {
   edgeObj = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 18), new THREE.LineBasicMaterial({ color: 0x1e40af }));
   scene.add(edgeObj);
 
-  // 表面マーカー：正三角形の突起（△、+Y 方向が頂点）
-  const mShape = new THREE.Shape();
-  mShape.moveTo(-MRK_MS, MRK_CY - MRK_MH / 3);
-  mShape.lineTo( MRK_MS, MRK_CY - MRK_MH / 3);
-  mShape.lineTo(0,       MRK_CY + 2 * MRK_MH / 3);
-  mShape.closePath();
-  const mGeo = new THREE.ExtrudeGeometry(mShape, { depth: MRK_RH, bevelEnabled: false });
-  mGeo.computeVertexNormals();
-  markerObj = new THREE.Mesh(mGeo, mat);
-  markerObj.position.z = THICKNESS;
-  scene.add(markerObj);
-
-  // 表面マーカー：正三角形の突起（+X 方向が頂点、V字溝と同方向）
+  // 表面マーカー：正三角形の突起（+X 方向が頂点）
   const fmShape = new THREE.Shape();
   fmShape.moveTo(MRK_CX - MRK_MH / 3, -MRK_MS);
   fmShape.lineTo(MRK_CX - MRK_MH / 3, +MRK_MS);
@@ -198,18 +180,10 @@ function generateSTL() {
     }
   }
 
-  // Square hole walls + V-groove on +X wall (sector-0 marker)
-  const h = hh, gw = 1.0, gd = 1.5, gn = 1 / Math.sqrt(gw*gw + gd*gd);
-  facet([-1,0,0], [h,-h,0], [h,-h,t], [h,-gw,0]);
-  facet([-1,0,0], [h,-h,t], [h,-gw,t], [h,-gw,0]);
-  facet([-1,0,0], [h, gw,0], [h, gw,t], [h, h,0]);
-  facet([-1,0,0], [h, gw,t], [h,  h,t], [h, h,0]);
-  facet([-gw*gn, gd*gn,0], [h,-gw,0], [h+gd,0,t], [h+gd,0,0]);
-  facet([-gw*gn, gd*gn,0], [h,-gw,t], [h+gd,0,t], [h,-gw,0]);
-  facet([-gw*gn,-gd*gn,0], [h+gd,0,0], [h,gw,t], [h,gw,0]);
-  facet([-gw*gn,-gd*gn,0], [h+gd,0,t], [h,gw,t], [h+gd,0,0]);
-  facet([0,0, 1], [h,-gw,t], [h+gd,0,t], [h, gw,t]);
-  facet([0,0,-1], [h,-gw,0], [h, gw,0], [h+gd,0,0]);
+  // Square hole walls
+  const h = hh;
+  facet([-1,0,0], [h,-h,0], [h,-h,t], [h, h,0]);
+  facet([-1,0,0], [h,-h,t], [h, h,t], [h, h,0]);
   facet([ 1,0,0], [-h, h,0], [-h, h,t], [-h,-h,0]);
   facet([ 1,0,0], [-h, h,t], [-h,-h,t], [-h,-h,0]);
   facet([0,-1,0], [ h, h,0], [ h, h,t], [-h, h,0]);
@@ -217,17 +191,8 @@ function generateSTL() {
   facet([0, 1,0], [-h,-h,0], [-h,-h,t], [ h,-h,0]);
   facet([0, 1,0], [-h,-h,t], [ h,-h,t], [ h,-h,0]);
 
-  // 表面マーカー：正三角形の突起（△）
-  const ms = MRK_MS, mh = MRK_MH, mcy = MRK_CY, mr = MRK_RH;
-  const BL  = [-ms, mcy - mh/3,    t     ], BR  = [ms, mcy - mh/3,    t     ], TT  = [0, mcy + 2*mh/3, t     ];
-  const BL2 = [-ms, mcy - mh/3,    t + mr], BR2 = [ms, mcy - mh/3,    t + mr], TT2 = [0, mcy + 2*mh/3, t + mr];
-  const s3 = Math.sqrt(3) / 2; // sin60°
-  facet([0,-1,0],     BL,  BR,  BR2);   facet([0,-1,0],     BL,  BR2, BL2);
-  facet([s3, 0.5, 0], BR,  TT,  TT2);   facet([s3, 0.5, 0], BR,  TT2, BR2);
-  facet([-s3,0.5, 0], TT,  BL,  BL2);   facet([-s3,0.5, 0], TT,  BL2, TT2);
-  facet([0, 0, 1],    BL2, BR2, TT2);
-
   // 表面マーカー：正三角形の突起（+X 方向が頂点）
+  const s3 = Math.sqrt(3) / 2;
   const cx = MRK_CX, mh2 = MRK_MH, ms2 = MRK_MS, mr2 = MRK_RH;
   const FBL  = [cx - mh2/3, -ms2,  0   ], FBR  = [cx - mh2/3, +ms2,  0   ], FTT  = [cx + 2*mh2/3, 0,  0   ];
   const FBL2 = [cx - mh2/3, -ms2, -mr2 ], FBR2 = [cx - mh2/3, +ms2, -mr2 ], FTT2 = [cx + 2*mh2/3, 0, -mr2 ];
