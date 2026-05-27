@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { SVGLoader }   from 'three/addons/loaders/SVGLoader.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import opentype from 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
 
 const RADII = [
   20,      // 0: ラ   φ40mm
@@ -29,11 +32,6 @@ let melody = [...DEFAULT_MELODY];
 function melodyToRadii() {
   let last = RADII[0];
   return melody.map(n => n >= 0 ? (last = RADII[n]) : last);
-}
-
-function sqPt(a) {
-  const c = Math.cos(a), s = Math.sin(a), m = Math.max(Math.abs(c), Math.abs(s));
-  return [HOLE_HALF * c / m, HOLE_HALF * s / m];
 }
 
 // ── Three.js ─────────────────────────────────────────────
@@ -68,7 +66,26 @@ controls.minDistance = 20;
 controls.maxDistance = 200;
 controls.update();
 
-let meshObj = null, edgeObj = null, frontMarkerObj = null;
+let meshObj = null, edgeObj = null, frontMarkerObj = null, textObj = null;
+
+// ── テキスト刻印 ──────────────────────────────────────────
+const TXT_DEPTH = 0.4;
+const TXT_CY    = -(HOLE_HALF + 6);
+const MAX_TXT_W = 16;
+const MAX_TXT_H = 4;
+const MIN_TXT_H = 2;
+
+const FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf';
+let otFont = null;
+const fontReady = fetch(FONT_URL)
+  .then(r => r.arrayBuffer())
+  .then(buf => { otFont = opentype.parse(buf); })
+  .then(() => {
+    const inp = document.getElementById('labelInput');
+    inp.disabled = false;
+    inp.value = 'キラキラ星';
+    buildTextGeometry('キラキラ星');
+  });
 
 // 表面マーカー用パラメータ（正三角形の突起）
 const MRK_MS = 1.5;                        // 半辺長 mm（辺長 3mm）
@@ -126,6 +143,48 @@ function buildGeometry() {
 }
 buildGeometry();
 
+function buildTextGeometry(text) {
+  if (textObj) {
+    scene.remove(textObj);
+    textObj.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+    textObj = null;
+  }
+  if (!text || !otFont) return;
+
+  let fontSize = MAX_TXT_H;
+  const rawBB = otFont.getPath(text, 0, 0, fontSize).getBoundingBox();
+  const rawW = rawBB.x2 - rawBB.x1;
+  if (rawW > MAX_TXT_W) fontSize = Math.max(MIN_TXT_H, fontSize * MAX_TXT_W / rawW);
+  const bb = otFont.getPath(text, 0, 0, fontSize).getBoundingBox();
+  const cx = (bb.x1 + bb.x2) / 2;
+  const cy = (bb.y1 + bb.y2) / 2;
+  const tx = x => cx - x;
+  const ty = y => -(y - cy) + TXT_CY;
+
+  textObj = new THREE.Group();
+
+  for (const path of otFont.getPaths(text, 0, 0, fontSize)) {
+    const sp = new THREE.ShapePath();
+    for (const cmd of path.commands) {
+      if      (cmd.type === 'M') sp.moveTo(tx(cmd.x), ty(cmd.y));
+      else if (cmd.type === 'L') sp.lineTo(tx(cmd.x), ty(cmd.y));
+      else if (cmd.type === 'C') sp.bezierCurveTo(tx(cmd.x1), ty(cmd.y1), tx(cmd.x2), ty(cmd.y2), tx(cmd.x), ty(cmd.y));
+      else if (cmd.type === 'Q') sp.quadraticCurveTo(tx(cmd.x1), ty(cmd.y1), tx(cmd.x), ty(cmd.y));
+      else if (cmd.type === 'Z') sp.currentPath?.closePath();
+    }
+    let shapes = sp.toShapes(false);
+    if (!shapes.length) shapes = sp.toShapes(true);
+    for (const shape of shapes) {
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: TXT_DEPTH, bevelEnabled: false });
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x7ab4d0, metalness: 0.25, roughness: 0.4, side: THREE.DoubleSide }));
+      mesh.position.z = -TXT_DEPTH;
+      textObj.add(mesh);
+    }
+  }
+  scene.add(textObj);
+}
+
 window.addEventListener('resize', () => {
   camera.aspect = container.clientWidth / container.clientHeight;
   camera.updateProjectionMatrix();
@@ -135,74 +194,8 @@ window.addEventListener('resize', () => {
 
 // ── STL generation ────────────────────────────────────────
 function generateSTL() {
-  const t = THICKNESS, hh = HOLE_HALF;
-  const seq = melodyToRadii();
-  const N = seq.length;
-  const lines = ['solid disk'];
-
-  function facet(n, v1, v2, v3) {
-    lines.push(
-      `  facet normal ${n[0].toFixed(6)} ${n[1].toFixed(6)} ${n[2].toFixed(6)}`,
-      '    outer loop',
-      `      vertex ${v1[0].toFixed(6)} ${v1[1].toFixed(6)} ${v1[2].toFixed(6)}`,
-      `      vertex ${v2[0].toFixed(6)} ${v2[1].toFixed(6)} ${v2[2].toFixed(6)}`,
-      `      vertex ${v3[0].toFixed(6)} ${v3[1].toFixed(6)} ${v3[2].toFixed(6)}`,
-      '    endloop',
-      '  endfacet'
-    );
-  }
-
-  for (let i = 0; i < N; i++) {
-    const r = seq[i], rn = seq[(i + 1) % N];
-    const as = 2 * Math.PI * i / N, ae = 2 * Math.PI * (i + 1) / N;
-
-    for (let j = 0; j < SUB; j++) {
-      const a1 = as + (ae - as) * j / SUB, a2 = as + (ae - as) * (j + 1) / SUB;
-      const ox1 = r * Math.cos(a1), oy1 = r * Math.sin(a1);
-      const ox2 = r * Math.cos(a2), oy2 = r * Math.sin(a2);
-      const [ix1, iy1] = sqPt(a1), [ix2, iy2] = sqPt(a2);
-      const deg = Math.abs(ix1 - ix2) < 1e-9 && Math.abs(iy1 - iy2) < 1e-9;
-
-      facet([0,0,1],  [ox1,oy1,t], [ox2,oy2,t], [ix2,iy2,t]);
-      if (!deg) facet([0,0,1],  [ox1,oy1,t], [ix2,iy2,t], [ix1,iy1,t]);
-      facet([0,0,-1], [ox1,oy1,0], [ix2,iy2,0], [ox2,oy2,0]);
-      if (!deg) facet([0,0,-1], [ox1,oy1,0], [ix1,iy1,0], [ix2,iy2,0]);
-
-      const nx = Math.cos((a1 + a2) / 2), ny = Math.sin((a1 + a2) / 2);
-      facet([nx,ny,0], [ox1,oy1,0], [ox2,oy2,0], [ox1,oy1,t]);
-      facet([nx,ny,0], [ox2,oy2,0], [ox2,oy2,t], [ox1,oy1,t]);
-    }
-
-    if (Math.abs(r - rn) > 1e-9) {
-      const c = Math.cos(ae), s = Math.sin(ae), sg = Math.sign(rn - r);
-      facet([sg*s,-sg*c,0], [r*c,r*s,0], [rn*c,rn*s,0], [rn*c,rn*s,t]);
-      facet([sg*s,-sg*c,0], [r*c,r*s,0], [rn*c,rn*s,t], [r*c,r*s,t]);
-    }
-  }
-
-  // Square hole walls
-  const h = hh;
-  facet([-1,0,0], [h,-h,0], [h,-h,t], [h, h,0]);
-  facet([-1,0,0], [h,-h,t], [h, h,t], [h, h,0]);
-  facet([ 1,0,0], [-h, h,0], [-h, h,t], [-h,-h,0]);
-  facet([ 1,0,0], [-h, h,t], [-h,-h,t], [-h,-h,0]);
-  facet([0,-1,0], [ h, h,0], [ h, h,t], [-h, h,0]);
-  facet([0,-1,0], [ h, h,t], [-h, h,t], [-h, h,0]);
-  facet([0, 1,0], [-h,-h,0], [-h,-h,t], [ h,-h,0]);
-  facet([0, 1,0], [-h,-h,t], [ h,-h,t], [ h,-h,0]);
-
-  // 表面マーカー：正三角形の突起（+X 方向が頂点）
-  const s3 = Math.sqrt(3) / 2;
-  const cx = MRK_CX, mh2 = MRK_MH, ms2 = MRK_MS, mr2 = MRK_RH;
-  const FBL  = [cx - mh2/3, -ms2,  0   ], FBR  = [cx - mh2/3, +ms2,  0   ], FTT  = [cx + 2*mh2/3, 0,  0   ];
-  const FBL2 = [cx - mh2/3, -ms2, -mr2 ], FBR2 = [cx - mh2/3, +ms2, -mr2 ], FTT2 = [cx + 2*mh2/3, 0, -mr2 ];
-  facet([-1, 0, 0],    FBL, FBR, FBR2);   facet([-1, 0, 0],    FBL, FBR2, FBL2);
-  facet([0.5, s3, 0],  FBR, FTT, FTT2);   facet([0.5, s3, 0],  FBR, FTT2, FBR2);
-  facet([0.5,-s3, 0],  FTT, FBL, FBL2);   facet([0.5,-s3, 0],  FTT, FBL2, FTT2);
-  facet([0, 0, -1],    FBL2, FBR2, FTT2);
-
-  lines.push('endsolid disk');
-  return lines.join('\n');
+  scene.updateMatrixWorld();
+  return new STLExporter().parse(scene, { binary: false });
 }
 
 // ── Piano roll ────────────────────────────────────────────
@@ -279,6 +272,16 @@ document.getElementById('playBtn').addEventListener('click', () => {
     osc.start(t0); osc.stop(t0 + beat);
   });
   setTimeout(() => { btn.disabled = false; }, melody.length * beat * 1000 + 200);
+});
+
+// ── Label input ───────────────────────────────────────────
+let labelDebounce = null;
+document.getElementById('labelInput').addEventListener('input', e => {
+  clearTimeout(labelDebounce);
+  labelDebounce = setTimeout(async () => {
+    await fontReady;
+    buildTextGeometry(e.target.value.trim());
+  }, 400);
 });
 
 // ── Download ──────────────────────────────────────────────
