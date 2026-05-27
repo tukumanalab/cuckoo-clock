@@ -68,7 +68,7 @@ controls.minDistance = 20;
 controls.maxDistance = 200;
 controls.update();
 
-let meshObj = null, edgeObj = null, markerObj = null;
+let meshObj = null, edgeObj = null, markerObj = null, frontTextObj = null;
 
 // 表面マーカー用パラメータ（正三角形の突起）
 const MRK_MS = 1.5;                        // 半辺長 mm（辺長 3mm）
@@ -76,10 +76,21 @@ const MRK_MH = MRK_MS * Math.sqrt(3);      // 三角形の高さ
 const MRK_CY = HOLE_HALF + 2.5;            // 中心 Y 座標（穴の上方）
 const MRK_RH = 0.4;                        // 突起高さ mm
 
+const TXT_SW  = 0.35;
+const TXT_D   = 0.5;
+const TXT_CY  = -(HOLE_HALF + 6);
+const TXT_CXS = [-4.0, 0.0, 4.0];
+const TXT_STROKES = [
+  [[-0.3, 1.5, 2.4, TXT_SW], [0.2, 0.0, TXT_SW, 3.6], [-0.6, -1.6, 1.8, TXT_SW]],         // オ
+  [[0.0, 1.7, 3.0, TXT_SW], [0.0, 0.2, 2.4, TXT_SW], [1.0, -0.8, TXT_SW, 1.8], [0.0, -1.7, 3.0, TXT_SW]], // モ
+  [[0.0, 1.7, 3.0, TXT_SW], [0.0, 0.4, 1.6, TXT_SW], [0.0, -0.8, TXT_SW, 2.8]],            // テ
+];
+
 function buildGeometry() {
-  if (meshObj)  { scene.remove(meshObj);  meshObj.geometry.dispose(); }
-  if (edgeObj)  { scene.remove(edgeObj);  edgeObj.geometry.dispose(); }
-  if (markerObj){ scene.remove(markerObj);markerObj.geometry.dispose(); }
+  if (meshObj)      { scene.remove(meshObj);      meshObj.geometry.dispose(); }
+  if (edgeObj)      { scene.remove(edgeObj);      edgeObj.geometry.dispose(); }
+  if (markerObj)    { scene.remove(markerObj);    markerObj.geometry.dispose(); }
+  if (frontTextObj) { scene.remove(frontTextObj); frontTextObj.children.forEach(m => m.geometry.dispose()); }
 
   const seq = melodyToRadii();
   const N = seq.length;
@@ -127,6 +138,17 @@ function buildGeometry() {
   markerObj = new THREE.Mesh(mGeo, mat);
   markerObj.position.z = THICKNESS;
   scene.add(markerObj);
+
+  // オモテ text on front face (z=0), protruding to z=-TXT_D
+  frontTextObj = new THREE.Group();
+  for (let c = 0; c < TXT_CXS.length; c++) {
+    for (const [sdx, sdy, sw, sh] of TXT_STROKES[c]) {
+      const tMesh = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, TXT_D), mat);
+      tMesh.position.set(TXT_CXS[c] + sdx, TXT_CY + sdy, -TXT_D / 2);
+      frontTextObj.add(tMesh);
+    }
+  }
+  scene.add(frontTextObj);
 }
 buildGeometry();
 
@@ -212,6 +234,25 @@ function generateSTL() {
   facet([s3, 0.5, 0], BR,  TT,  TT2);   facet([s3, 0.5, 0], BR,  TT2, BR2);
   facet([-s3,0.5, 0], TT,  BL,  BL2);   facet([-s3,0.5, 0], TT,  BL2, TT2);
   facet([0, 0, 1],    BL2, BR2, TT2);
+
+  // オモテ text on front face (z=0), protruding to z=-TXT_D
+  const d = TXT_D;
+  for (let c = 0; c < TXT_CXS.length; c++) {
+    for (const [sdx, sdy, sw, sh] of TXT_STROKES[c]) {
+      const acx = TXT_CXS[c] + sdx, acy = TXT_CY + sdy;
+      const x1 = acx - sw/2, x2 = acx + sw/2, y1 = acy - sh/2, y2 = acy + sh/2;
+      facet([0,0,-1],  [x1,y1,-d], [x1,y2,-d], [x2,y2,-d]);
+      facet([0,0,-1],  [x1,y1,-d], [x2,y2,-d], [x2,y1,-d]);
+      facet([0,-1,0],  [x2,y1, 0], [x1,y1, 0], [x1,y1,-d]);
+      facet([0,-1,0],  [x2,y1, 0], [x1,y1,-d], [x2,y1,-d]);
+      facet([0, 1,0],  [x1,y2, 0], [x2,y2, 0], [x2,y2,-d]);
+      facet([0, 1,0],  [x1,y2, 0], [x2,y2,-d], [x1,y2,-d]);
+      facet([-1,0,0],  [x1,y1, 0], [x1,y2, 0], [x1,y2,-d]);
+      facet([-1,0,0],  [x1,y1, 0], [x1,y2,-d], [x1,y1,-d]);
+      facet([1, 0,0],  [x2,y2, 0], [x2,y1, 0], [x2,y1,-d]);
+      facet([1, 0,0],  [x2,y2, 0], [x2,y1,-d], [x2,y2,-d]);
+    }
+  }
 
   lines.push('endsolid disk');
   return lines.join('\n');
