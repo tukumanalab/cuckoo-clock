@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { SVGLoader }   from 'three/addons/loaders/SVGLoader.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
-import opentype from 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
 
 const RADII = [
   20,      // 0: ラ   φ40mm
@@ -66,26 +64,7 @@ controls.minDistance = 20;
 controls.maxDistance = 200;
 controls.update();
 
-let meshObj = null, edgeObj = null, frontMarkerObj = null, textObj = null;
-
-// ── テキスト刻印 ──────────────────────────────────────────
-const TXT_DEPTH = 0.4;
-const TXT_CY    = -(HOLE_HALF + 6);
-const MAX_TXT_W = 16;
-const MAX_TXT_H = 4;
-const MIN_TXT_H = 2;
-
-const FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf';
-let otFont = null;
-const fontReady = fetch(FONT_URL)
-  .then(r => r.arrayBuffer())
-  .then(buf => { otFont = opentype.parse(buf); })
-  .then(() => {
-    const inp = document.getElementById('labelInput');
-    inp.disabled = false;
-    inp.value = 'キラキラ星';
-    buildTextGeometry('キラキラ星');
-  });
+let meshObj = null, edgeObj = null, frontMarkerObj = null;
 
 // 表面マーカー用パラメータ（正三角形の突起）
 const MRK_MS = 1.5;                        // 半辺長 mm（辺長 3mm）
@@ -142,48 +121,6 @@ function buildGeometry() {
   scene.add(frontMarkerObj);
 }
 buildGeometry();
-
-function buildTextGeometry(text) {
-  if (textObj) {
-    scene.remove(textObj);
-    textObj.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
-    textObj = null;
-  }
-  if (!text || !otFont) return;
-
-  let fontSize = MAX_TXT_H;
-  const rawBB = otFont.getPath(text, 0, 0, fontSize).getBoundingBox();
-  const rawW = rawBB.x2 - rawBB.x1;
-  if (rawW > MAX_TXT_W) fontSize = Math.max(MIN_TXT_H, fontSize * MAX_TXT_W / rawW);
-  const bb = otFont.getPath(text, 0, 0, fontSize).getBoundingBox();
-  const cx = (bb.x1 + bb.x2) / 2;
-  const cy = (bb.y1 + bb.y2) / 2;
-  const tx = x => cx - x;
-  const ty = y => -(y - cy) + TXT_CY;
-
-  textObj = new THREE.Group();
-
-  for (const path of otFont.getPaths(text, 0, 0, fontSize)) {
-    const sp = new THREE.ShapePath();
-    for (const cmd of path.commands) {
-      if      (cmd.type === 'M') sp.moveTo(tx(cmd.x), ty(cmd.y));
-      else if (cmd.type === 'L') sp.lineTo(tx(cmd.x), ty(cmd.y));
-      else if (cmd.type === 'C') sp.bezierCurveTo(tx(cmd.x1), ty(cmd.y1), tx(cmd.x2), ty(cmd.y2), tx(cmd.x), ty(cmd.y));
-      else if (cmd.type === 'Q') sp.quadraticCurveTo(tx(cmd.x1), ty(cmd.y1), tx(cmd.x), ty(cmd.y));
-      else if (cmd.type === 'Z') sp.currentPath?.closePath();
-    }
-    let shapes = sp.toShapes(false);
-    if (!shapes.length) shapes = sp.toShapes(true);
-    for (const shape of shapes) {
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: TXT_DEPTH, bevelEnabled: false });
-      geo.computeVertexNormals();
-      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x7ab4d0, metalness: 0.25, roughness: 0.4, side: THREE.DoubleSide }));
-      mesh.position.z = -TXT_DEPTH;
-      textObj.add(mesh);
-    }
-  }
-  scene.add(textObj);
-}
 
 window.addEventListener('resize', () => {
   camera.aspect = container.clientWidth / container.clientHeight;
@@ -272,16 +209,6 @@ document.getElementById('playBtn').addEventListener('click', () => {
     osc.start(t0); osc.stop(t0 + beat);
   });
   setTimeout(() => { btn.disabled = false; }, melody.length * beat * 1000 + 200);
-});
-
-// ── Label input ───────────────────────────────────────────
-let labelDebounce = null;
-document.getElementById('labelInput').addEventListener('input', e => {
-  clearTimeout(labelDebounce);
-  labelDebounce = setTimeout(async () => {
-    await fontReady;
-    buildTextGeometry(e.target.value.trim());
-  }, 400);
 });
 
 // ── Download ──────────────────────────────────────────────
