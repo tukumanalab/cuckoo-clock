@@ -135,6 +135,40 @@ function generateSTL() {
   return new STLExporter().parse(scene, { binary: false });
 }
 
+// ── SVG generation ────────────────────────────────────────
+function generateSVG() {
+  const seq = melodyToRadii();
+  const N = seq.length;
+  const f = v => v.toFixed(3);
+
+  // 外周輪郭（STL と同じく段付きで生成）。SVG は y 軸下向きなので y を反転。
+  let d = `M ${f(seq[0])} ${f(0)}`;
+  for (let i = 0; i < N; i++) {
+    const a1 = 2 * Math.PI * i / N, a2 = 2 * Math.PI * (i + 1) / N;
+    const r = seq[i], rn = seq[(i + 1) % N];
+    for (let j = 1; j <= SUB; j++) {
+      const a = a1 + (a2 - a1) * j / SUB;
+      d += ` L ${f(r * Math.cos(a))} ${f(-r * Math.sin(a))}`;
+    }
+    if (Math.abs(r - rn) > 1e-9) d += ` L ${f(rn * Math.cos(a2))} ${f(-rn * Math.sin(a2))}`;
+  }
+  d += ' Z';
+
+  // 中央穴（+X 側に V 溝マーカー）。evenodd で抜く。
+  const h = HOLE_HALF, gw = 1.0, gd = 1.5;
+  const hole = [[-h,-h],[h,-h],[h,-gw],[h+gd,0],[h,gw],[h,h],[-h,h]];
+  let hd = `M ${f(hole[0][0])} ${f(-hole[0][1])}`;
+  for (let k = 1; k < hole.length; k++) hd += ` L ${f(hole[k][0])} ${f(-hole[k][1])}`;
+  hd += ' Z';
+
+  const R = RADII[0] + 0.5; // 余白付き半径
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${f(2*R)}mm" height="${f(2*R)}mm" viewBox="${f(-R)} ${f(-R)} ${f(2*R)} ${f(2*R)}">
+  <path d="${d} ${hd}" fill="#7ab4d0" fill-rule="evenodd" stroke="#1e40af" stroke-width="0.2"/>
+</svg>
+`;
+}
+
 // ── Piano roll ────────────────────────────────────────────
 const pianoRoll = document.getElementById('piano-roll');
 let prCells = [];
@@ -212,8 +246,14 @@ document.getElementById('playBtn').addEventListener('click', () => {
 });
 
 // ── Download ──────────────────────────────────────────────
-document.getElementById('downloadBtn').addEventListener('click', () => {
-  const url = URL.createObjectURL(new Blob([generateSTL()], { type: 'text/plain' }));
-  Object.assign(document.createElement('a'), { href: url, download: 'melody_disk.stl' }).click();
+function download(content, filename, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  Object.assign(document.createElement('a'), { href: url, download: filename }).click();
   URL.revokeObjectURL(url);
-});
+}
+
+document.getElementById('downloadBtn').addEventListener('click', () =>
+  download(generateSTL(), 'melody_disk.stl', 'text/plain'));
+
+document.getElementById('downloadSvgBtn').addEventListener('click', () =>
+  download(generateSVG(), 'melody_disk.svg', 'image/svg+xml'));

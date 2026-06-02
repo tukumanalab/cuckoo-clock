@@ -81,14 +81,18 @@ h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 }
 .preview-hint { text-align: center; color: #94a3b8; font-size: 0.78rem; margin-bottom: 24px; }
 
-/* Download button */
-#downloadBtn {
-  width: 100%; padding: 14px;
+/* Download buttons */
+.download-row { display: flex; gap: 10px; }
+#downloadBtn, #downloadSvgBtn {
+  flex: 1; padding: 14px;
   background: #2563eb; color: #fff;
   border: none; border-radius: 8px;
   font-size: 1rem; font-weight: 600;
   cursor: pointer; transition: background 0.15s;
 }
+#downloadSvgBtn { background: #0e7490; }
 #downloadBtn:hover  { background: #1d4ed8; }
 #downloadBtn:active { background: #1e40af; }
+#downloadSvgBtn:hover  { background: #155e75; }
+#downloadSvgBtn:active { background: #164e63; }
 
