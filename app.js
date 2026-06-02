@@ -154,7 +154,7 @@ function generateSVG() {
   }
   d += ' Z';
 
-  // 中央穴（+X 側に V 溝マーカー）。evenodd で抜く。
+  // 中央穴（+X 側に V 溝マーカー）。
   const h = HOLE_HALF, gw = 1.0, gd = 1.5;
   const hole = [[-h,-h],[h,-h],[h,-gw],[h+gd,0],[h,gw],[h,h],[-h,h]];
   let hd = `M ${f(hole[0][0])} ${f(-hole[0][1])}`;
@@ -164,7 +164,7 @@ function generateSVG() {
   const R = RADII[0] + 0.5; // 余白付き半径
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${f(2*R)}mm" height="${f(2*R)}mm" viewBox="${f(-R)} ${f(-R)} ${f(2*R)} ${f(2*R)}">
-  <path d="${d} ${hd}" fill="#7ab4d0" fill-rule="evenodd" stroke="#1e40af" stroke-width="0.2"/>
+  <path d="${d} ${hd}" fill="none" stroke="#000000" stroke-width="0.1"/>
 </svg>
 `;
 }
