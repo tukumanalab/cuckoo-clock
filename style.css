@@ -126,6 +126,32 @@ h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 #downloadPdfBtn:hover  { background: #92400e; }
 #downloadPdfBtn:active { background: #78350f; }
 
+/* GitHub ribbon */
+.github-ribbon {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1000;
+  width: 80px;
+  height: 80px;
+  overflow: hidden;
+}
+.github-ribbon svg {
+  width: 80px;
+  height: 80px;
+}
+.github-ribbon .octo-arm {
+  animation: none;
+}
+.github-ribbon:hover .octo-arm {
+  animation: octocat-wave 560ms ease-in-out;
+}
+@keyframes octocat-wave {
+  0%, 100% { transform: rotate(0); }
+  20%, 60% { transform: rotate(-25deg); }
+  40%, 80% { transform: rotate(10deg); }
+}
+
 /* Footer */
 .site-footer {
   margin-top: 28px;
@@ -137,4 +163,5 @@ h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
 }
 .site-footer a { color: #64748b; text-decoration: none; font-weight: 600; }
 .site-footer a:hover { color: #2563eb; text-decoration: underline; }
+.site-footer__sep { margin: 0 6px; }
 
