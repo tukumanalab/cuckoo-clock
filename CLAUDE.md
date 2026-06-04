@@ -10,7 +10,7 @@
 | ファイル | 内容 |
 |---|---|
 | `index.html` | UI レイアウト（メロディエディター・3D プレビュー・各種ボタン） |
-| `app.js` | STL/SVG 生成・Three.js プレビュー・ピアノロール・ドレミ txt 読み込み |
+| `app.js` | STL/SVG 生成・Three.js プレビュー・ピアノロール・MIDI 読み込み/保存 |
 | `style.css` | スタイル |
 
 ### 音源・楽譜ファイル（`sound_files/` 以下）
@@ -20,7 +20,9 @@
 | ファイル | 内容 |
 |---|---|
 | `sound_files/AMA2.pdf` | インポート対象の楽譜（MuseScore 4 出力、25/4・25 音） |
-| `sound_files/AMA2.txt` | AMA2.pdf から判読したドレミ列（読み込み用サンプル） |
+| `sound_files/AMA2.txt` | AMA2.pdf から判読したドレミ列（旧フォーマットの記録） |
+| `sound_files/AMA2.midi` | AMA2 の SMF（読み込み用サンプル、format 1・480tpq・♩=300・25/4） |
+| `sound_files/FAN2.midi` | FAN2 の SMF（同上） |
 | `sound_files/forward.m4a` | ディスクを正方向に回転させたときの録音（5音サイクル） |
 | `sound_files/backward.m4a` | ディスクを逆方向に回転させたときの録音（5音サイクル） |
 | `sound_files/low.m4a` | φ30mm 単音ディスクの録音（全25セクター同一径） |
@@ -108,17 +110,27 @@ const SUB = 8; // セクターあたりの弧分割数
 const REST_R = 8; // 休符用の最小半径（琴爪に当たらない）
 ```
 
-## 曲のインポート（ドレミ txt 経由）
+## 曲のインポート（MIDI 経由）
 
-PDF 楽譜などの曲をアプリに取り込む仕組み。アプリ側は **ドレミ txt の読み込み機能**だけを持ち、
-PDF → ドレミ txt の変換は Claude Code（手作業）で行う方針。
+曲は **MIDI ファイル（SMF）** でアプリと読み書きする（2026-06-04 にドレミ txt から置き換え）。
+UI は「MIDIファイル読込」「MIDIファイル保存」ボタン（`loadBtn` + hidden `loadFile` / `saveBtn`）。
 
-### ドレミ txt フォーマット
-- 1 音 = 1 トークン、空白/改行区切り。25 音想定（超過は切り捨て、不足は休符で埋め）
-- 音名は `NOTE_SOLFEGE`（`ラ ソ# ソ ファ# ファ ミ レ# レ ド# ド` = A4〜C4 の半音階 10 音・1 オクターブ）
-- 休符は `-`、行頭 `//` はコメント
-- 実装: `app.js` の `SOLFEGE_TO_INDEX` / `parseSolfege()`、UI は「ファイル読込」ボタン（`loadBtn` + hidden `loadFile`）
-- 実例: `sound_files/AMA2.txt`
+### MIDI 読み込み仕様（`app.js` の `parseMidi()` / `midiNoteToIndex()`）
+- SMF format 0/1 対応（SMPTE 時間形式は非対応）。全トラックのノートオンを tick 順に統合
+- 1 拍 = 4 分音符として `round(tick / division)` 拍目のセクターに割り当て。音のない拍は休符
+- 音高はオクターブ畳み込みで `NOTE_SOLFEGE`（`ラ ソ# ソ ファ# ファ ミ レ# レ ド# ド` = A〜C の
+  半音階 10 音）へ対応付け。A#・B 系は畳み込めないため無視
+- 25 拍超過・音域外・同一拍重複（和音は先勝ち）は無視し、件数を alert で通知
+- 最初のテンポメタを試聴テンポ（`bpm`、初期 ♩=300）に反映。試聴と MIDI のテンポは常に一致させる
+- 実例: `sound_files/AMA2.midi` / `sound_files/FAN2.midi`
+
+### MIDI 保存仕様（`app.js` の `melodyToMidi()`）
+- format 0・1 トラック・480tpq・拍子 25/4・テンポは現在の `bpm`（サンプル MIDI と同じ規約）
+- 1 音 = 4 分音符（長さ 360tick・ベロシティ 95）、音高は A5(81)〜C5(72)、休符は無音区間
+
+### 旧フォーマット: ドレミ txt（アプリ読み込みは廃止）
+- 1 音 = 1 トークン、空白/改行区切り。休符は `-`、行頭 `//` はコメント
+- `sound_files/AMA2.txt` / `FAN2.txt` は PDF 判読結果の記録として残置
 
 ### PDF 楽譜 → ドレミ txt の判読ロジック（OMR）
 

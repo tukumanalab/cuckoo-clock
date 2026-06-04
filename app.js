@@ -247,6 +247,7 @@ buildPianoRoll();
 
 // ── Audio preview ─────────────────────────────────────────
 let audioCtx = null;
+let bpm = 300;   // サンプル MIDI と同じ ♩=300。MIDI 読込時はそのテンポに追従し、保存にも使う。
 
 document.getElementById('clearBtn').addEventListener('click', () => {
   melody.fill(-1);
@@ -256,7 +257,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
 
 document.getElementById('playBtn').addEventListener('click', () => {
   audioCtx ??= new AudioContext();
-  const bpm = 150, beat = 60 / bpm, now = audioCtx.currentTime + 0.05;
+  const beat = 60 / bpm, now = audioCtx.currentTime + 0.05;
   const btn = document.getElementById('playBtn');
   btn.disabled = true;
   melody.forEach((n, i) => {
@@ -317,57 +318,129 @@ pdfBtn.addEventListener('click', async () => {
   }
 });
 
-// ── ドレミ txt 読み込み ───────────────────────────────────
-// NOTE_SOLFEGE から逆引き（'ファ#'→3 等）。休符は '-'。
-const SOLFEGE_TO_INDEX = NOTE_SOLFEGE.reduce((m, s, i) => (m[s] = i, m), { '-': -1 });
+// ── MIDI ファイル読み込み・保存 ───────────────────────────
+// SMF を解析し、ノートオン列を 1 拍 = 4 分音符として melody に割り当てる。
+// アプリ音域はラ〜ド（A〜C の 10 半音）なので、オクターブ畳み込みで対応付ける。
 
-// ドレミ列テキストを melody の index 配列に変換する。
-// 仕様: 1 音 = 1 トークン（空白/改行区切り）、行頭 // はコメント、休符は '-'。
-function parseSolfege(text) {
-  const tokens = text
-    .split('\n')
-    .filter(line => !line.trim().startsWith('//'))
-    .join(' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  const seq = [], unknown = [];
-  for (const t of tokens) {
-    if (t in SOLFEGE_TO_INDEX) seq.push(SOLFEGE_TO_INDEX[t]);
-    else unknown.push(t);
-  }
-  return { seq, unknown };
+// MIDI ノート番号 → melody index（0=ラ…9=ド）。畳み込めない A#・B 系は null。
+function midiNoteToIndex(note) {
+  const i = ((69 - note) % 12 + 12) % 12;   // A からの下行半音数（オクターブ無視）
+  return i < NOTE_SOLFEGE.length ? i : null;
 }
 
-// melody をドレミ列テキストに変換（保存用）。休符は '-'。
-function melodyToSolfege() {
-  return melody.map(n => n < 0 ? '-' : NOTE_SOLFEGE[n]).join(' ');
+// SMF (format 0/1) の全トラックからノートオンを { tick, note } の列で取り出す。
+function parseMidi(buffer) {
+  const b = new Uint8Array(buffer);
+  let p = 0;
+  const u16 = () => (p += 2, (b[p - 2] << 8) | b[p - 1]);
+  const u32 = () => (p += 4, ((b[p - 4] << 24) | (b[p - 3] << 16) | (b[p - 2] << 8) | b[p - 1]) >>> 0);
+  const vlq = () => { let v = 0, c; do { c = b[p++]; v = (v << 7) | (c & 0x7f); } while (c & 0x80); return v; };
+
+  if (u32() !== 0x4d546864) throw new Error('MIDI ファイル（SMF）ではありません');   // 'MThd'
+  p += 4;                       // ヘッダー長（常に 6）
+  u16();                        // format
+  const ntrk = u16();
+  const division = u16();       // 4 分音符あたりの tick 数
+  if (division & 0x8000) throw new Error('SMPTE 時間形式には未対応です');
+
+  const notes = [];
+  let tempo = null;             // 最初のテンポメタ（µs/4 分音符）
+  for (let t = 0; t < ntrk; t++) {
+    if (u32() !== 0x4d54726b) throw new Error('トラックの解析に失敗しました');       // 'MTrk'
+    const trkLen = u32();
+    const end = p + trkLen;
+    let tick = 0, running = 0;
+    while (p < end) {
+      tick += vlq();
+      let s = b[p];
+      if (s & 0x80) p++; else s = running;                // ランニングステータス
+      if (s === 0xff) {                                            // メタイベント（型 1 byte + 可変長データ）
+        const type = b[p++];
+        const len = vlq();
+        if (type === 0x51 && len === 3 && tempo === null) tempo = (b[p] << 16) | (b[p + 1] << 8) | b[p + 2];
+        p += len;
+      }
+      else if (s === 0xf0 || s === 0xf7) { const len = vlq(); p += len; }  // SysEx
+      else {
+        running = s;
+        const hi = s & 0xf0;
+        if (hi === 0x90 && b[p + 1] > 0) notes.push({ tick, note: b[p] });
+        p += (hi === 0xc0 || hi === 0xd0) ? 1 : 2;        // プログラム/チャンネルプレッシャーのみ 1 byte
+      }
+    }
+    p = end;
+  }
+  notes.sort((x, y) => x.tick - y.tick);
+  return { notes, division, tempo };
+}
+
+// melody を SMF format 0 に変換（保存用）。サンプル MIDI と同じ 25/4・4 分音符刻み・A5〜C5。
+function melodyToMidi() {
+  const TPQ = 480, DUR = 360;
+  const vlq = v => { const out = [v & 0x7f]; while ((v >>= 7) > 0) out.unshift((v & 0x7f) | 0x80); return out; };
+  const tempo = Math.round(60e6 / bpm);              // µs/拍。試聴と同じテンポで書き出す
+  const body = [
+    0, 0xff, 0x51, 0x03, (tempo >> 16) & 0xff, (tempo >> 8) & 0xff, tempo & 0xff,
+    0, 0xff, 0x58, 0x04, melody.length, 2, 24, 8,    // 拍子 25/4（1 周 = 1 小節）
+  ];
+  let cursor = 0;
+  melody.forEach((n, i) => {
+    if (n < 0) return;
+    const note = 81 - n;                             // 0=ラ→A5(81) … 9=ド→C5(72)
+    body.push(...vlq(i * TPQ - cursor), 0x90, note, 0x5f);
+    body.push(...vlq(DUR), 0x80, note, 0x40);
+    cursor = i * TPQ + DUR;
+  });
+  body.push(0, 0xff, 0x2f, 0x00);                    // End of Track
+  return new Uint8Array([
+    0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6,              // 'MThd'
+    0, 0, 0, 1, TPQ >> 8, TPQ & 0xff,                // format 0・1 トラック・480tpq
+    0x4d, 0x54, 0x72, 0x6b,                          // 'MTrk'
+    (body.length >>> 24) & 0xff, (body.length >>> 16) & 0xff, (body.length >>> 8) & 0xff, body.length & 0xff,
+    ...body,
+  ]);
 }
 
 document.getElementById('loadBtn').addEventListener('click', () =>
   document.getElementById('loadFile').click());
 
 document.getElementById('saveBtn').addEventListener('click', () =>
-  download(melodyToSolfege() + '\n', 'melody.txt', 'text/plain'));
+  download(melodyToMidi(), 'melody.midi', 'audio/midi'));
 
 document.getElementById('loadFile').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    const { seq, unknown } = parseSolfege(reader.result);
+    let parsed;
+    try {
+      parsed = parseMidi(reader.result);
+    } catch (err) {
+      alert('MIDI の読み込みに失敗しました: ' + err.message);
+      return;
+    }
     const N = melody.length;                 // 25 セクター固定
-    const next = seq.slice(0, N);            // 超過は切り捨て
-    while (next.length < N) next.push(-1);   // 不足は休符で埋め
+    const next = new Array(N).fill(-1);      // 音のない拍は休符
+    let overflow = 0, outOfRange = 0, collision = 0;
+    for (const { tick, note } of parsed.notes) {
+      const beat = Math.round(tick / parsed.division);   // 1 拍 = 4 分音符
+      const idx = midiNoteToIndex(note);
+      if (beat >= N) overflow++;
+      else if (idx === null) outOfRange++;
+      else if (next[beat] >= 0) collision++;             // 同一拍の重複（和音）は先勝ち
+      else next[beat] = idx;
+    }
+    if (parsed.tempo) bpm = Math.round(60e6 / parsed.tempo);   // 試聴テンポを MIDI に合わせる
     melody = next;
     refreshPianoRoll();
     buildGeometry();
     const msgs = [];
-    if (seq.length > N) msgs.push(`${seq.length} 音中、先頭 ${N} 音を読み込みました。`);
-    if (seq.length < N) msgs.push(`${seq.length} 音を読み込み、残り ${N - seq.length} 音は休符にしました。`);
-    if (unknown.length) msgs.push(`未対応の記号を無視しました: ${[...new Set(unknown)].join(' ')}`);
+    if (!parsed.notes.length) msgs.push('ノートが見つかりませんでした。');
+    if (overflow) msgs.push(`${N} 拍を超える ${overflow} 音を切り捨てました。`);
+    if (outOfRange) msgs.push(`音域（ラ〜ド）に畳み込めない ${outOfRange} 音を無視しました。`);
+    if (collision) msgs.push(`同じ拍に重なる ${collision} 音を無視しました。`);
     if (msgs.length) alert(msgs.join('\n'));
   };
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);
   e.target.value = '';   // 同じファイルを連続で選べるようにリセット
 });
