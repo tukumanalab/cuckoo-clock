@@ -117,7 +117,7 @@ PDF → ドレミ txt の変換は Claude Code（手作業）で行う方針。
 - 1 音 = 1 トークン、空白/改行区切り。25 音想定（超過は切り捨て、不足は休符で埋め）
 - 音名は `NOTE_SOLFEGE`（`ラ ソ# ソ ファ# ファ ミ レ# レ ド# ド` = A4〜C4 の半音階 10 音・1 オクターブ）
 - 休符は `-`、行頭 `//` はコメント
-- 実装: `app.js` の `SOLFEGE_TO_INDEX` / `parseSolfege()`、UI は「ドレミ読込」ボタン（`loadBtn` + hidden `loadFile`）
+- 実装: `app.js` の `SOLFEGE_TO_INDEX` / `parseSolfege()`、UI は「ファイル読込」ボタン（`loadBtn` + hidden `loadFile`）
 - 実例: `sound_files/AMA2.txt`
 
 ### PDF 楽譜 → ドレミ txt の判読ロジック（OMR）
