@@ -282,10 +282,10 @@ function download(content, filename, type) {
 }
 
 document.getElementById('downloadBtn').addEventListener('click', () =>
-  download(generateSTL(), 'melody_disk.stl', 'text/plain'));
+  download(generateSTL(), 'melody_cam.stl', 'text/plain'));
 
 document.getElementById('downloadSvgBtn').addEventListener('click', () =>
-  download(generateSVG(), 'melody_disk.svg', 'image/svg+xml'));
+  download(generateSVG(), 'melody_cam.svg', 'image/svg+xml'));
 
 // 厚紙貼付け・プリント用に、枠データを原寸（mm）の PDF で出力。
 // jsPDF + svg2pdf.js は重いので、押下時に動的 import する。
@@ -309,7 +309,7 @@ pdfBtn.addEventListener('click', async () => {
     const opts = { x: 0, y: 0, width: size, height: size };
     if (typeof doc.svg === 'function') await doc.svg(svgEl, opts);   // プラグイン版
     else await svg2pdf(svgEl, doc, opts);                            // 関数版
-    doc.save('melody_disk.pdf');
+    doc.save('melody_cam.pdf');
   } catch (err) {
     alert('PDF の生成に失敗しました: ' + err.message);
   } finally {
