@@ -18,6 +18,47 @@ const RADII = [
 const HOLE_HALF = 5.25;
 const THICKNESS = 1.8;
 const SUB = 8;
+// 径が変わる段差の角を丸める量。セクター角(2π/N)に対する割合で、境界の前後それぞれこの弧幅ぶんを丸めに使う。
+const FILLET_FRAC = 0.35;
+const FILLET_SUB = 6;   // フィレット曲線の分割数
+
+// カム外周の輪郭を [x,y] 点列で返す。径が変わる境界の角を二次ベジェで丸める（音飛び対策）。
+function camOutline(seq) {
+  const N = seq.length;
+  const step = 2 * Math.PI / N;
+  // 各セクター境界 i（角度 i*step）で径 seq[i-1] → seq[i] に変わる。境界前後を弧上の点で表しつつ、角を丸める。
+  const pts = [];
+  const P = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+  for (let i = 0; i < N; i++) {
+    const a0 = i * step, a1 = (i + 1) * step;
+    const r = seq[i], rPrev = seq[(i - 1 + N) % N], rNext = seq[(i + 1) % N];
+    // このセクターの弧を、始端側の丸めぶんを空けて、終端側の丸めぶんを空けて描く。
+    const fillStart = Math.abs(r - rPrev) > 1e-9 ? FILLET_FRAC : 0; // 始端(a0)側に段差があるか
+    const fillEnd   = Math.abs(r - rNext) > 1e-9 ? FILLET_FRAC : 0; // 終端(a1)側に段差があるか
+    const aFrom = a0 + fillStart * step;
+    const aTo   = a1 - fillEnd   * step;
+    // 弧本体
+    for (let j = 0; j <= SUB; j++) {
+      const a = aFrom + (aTo - aFrom) * j / SUB;
+      pts.push(P(r, a));
+    }
+    // 終端側の段差を丸める（次セクターとの角）。境界角×大径 を制御点に二次ベジェで繋ぐ。
+    // 山(外角)では角が張り出し、谷(内角)では引っ込んで、どちらも丸くなる。
+    if (fillEnd > 0) {
+      const p0 = P(r, aTo);                        // 現セクター弧の終端
+      const p2 = P(rNext, a1 + FILLET_FRAC * step); // 次セクター弧の始端
+      const corner = P(Math.max(r, rNext), a1);    // 段差の角（境界角・大きい方の径）
+      for (let j = 1; j <= FILLET_SUB; j++) {
+        const t = j / FILLET_SUB;
+        const mt = 1 - t;
+        const bx = mt*mt*p0[0] + 2*mt*t*corner[0] + t*t*p2[0];
+        const by = mt*mt*p0[1] + 2*mt*t*corner[1] + t*t*p2[1];
+        pts.push([bx, by]);
+      }
+    }
+  }
+  return pts;
+}
 
 const NOTE_COLORS  = ['#ef4444','#f97316','#fb923c','#eab308','#a3e635','#84cc16','#22c55e','#06b6d4','#3b82f6','#8b5cf6'];
 const NOTE_SOLFEGE = ['ラ','ソ#','ソ','ファ#','ファ','ミ','レ#','レ','ド#','ド'];
@@ -87,18 +128,10 @@ function buildGeometry() {
   if (edgeObj) { scene.remove(edgeObj); edgeObj.geometry.dispose(); }
 
   const seq = melodyToRadii();
-  const N = seq.length;
+  const outline = camOutline(seq);
   const shape = new THREE.Shape();
-  shape.moveTo(seq[0], 0);
-  for (let i = 0; i < N; i++) {
-    const a1 = 2 * Math.PI * i / N, a2 = 2 * Math.PI * (i + 1) / N;
-    const r = seq[i], rn = seq[(i + 1) % N];
-    for (let j = 1; j <= SUB; j++) {
-      const a = a1 + (a2 - a1) * j / SUB;
-      shape.lineTo(r * Math.cos(a), r * Math.sin(a));
-    }
-    if (Math.abs(r - rn) > 1e-9) shape.lineTo(rn * Math.cos(a2), rn * Math.sin(a2));
-  }
+  shape.moveTo(outline[0][0], outline[0][1]);
+  for (let k = 1; k < outline.length; k++) shape.lineTo(outline[k][0], outline[k][1]);
   shape.closePath();
 
   const pts = holePoints();
@@ -152,20 +185,12 @@ function generateSTL() {
 // ── SVG generation ────────────────────────────────────────
 function generateSVG() {
   const seq = melodyToRadii();
-  const N = seq.length;
   const f = v => v.toFixed(3);
 
-  // 外周輪郭（STL と同じく段付きで生成）。SVG は y 軸下向きなので y を反転。
-  let d = `M ${f(seq[0])} ${f(0)}`;
-  for (let i = 0; i < N; i++) {
-    const a1 = 2 * Math.PI * i / N, a2 = 2 * Math.PI * (i + 1) / N;
-    const r = seq[i], rn = seq[(i + 1) % N];
-    for (let j = 1; j <= SUB; j++) {
-      const a = a1 + (a2 - a1) * j / SUB;
-      d += ` L ${f(r * Math.cos(a))} ${f(-r * Math.sin(a))}`;
-    }
-    if (Math.abs(r - rn) > 1e-9) d += ` L ${f(rn * Math.cos(a2))} ${f(-rn * Math.sin(a2))}`;
-  }
+  // 外周輪郭（STL と同じ camOutline で角を丸めて生成）。SVG は y 軸下向きなので y を反転。
+  const outline = camOutline(seq);
+  let d = `M ${f(outline[0][0])} ${f(-outline[0][1])}`;
+  for (let k = 1; k < outline.length; k++) d += ` L ${f(outline[k][0])} ${f(-outline[k][1])}`;
   d += ' Z';
 
   // 中央穴（始点 +X 側に三角切り込み）。
