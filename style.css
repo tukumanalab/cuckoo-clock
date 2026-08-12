@@ -107,6 +107,12 @@ h1 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
   margin-bottom: 6px;
 }
 .preview-hint { text-align: center; color: #94a3b8; font-size: 0.78rem; margin-bottom: 24px; }
+/* WebGL が使えない環境で 3D プレビューの代わりに出す案内 */
+.preview-fallback {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; margin: 0; padding: 0 24px;
+  text-align: center; color: #64748b; font-size: 0.82rem; line-height: 1.6;
+}
 
 /* Download buttons */
 .download-row { display: flex; gap: 10px; }

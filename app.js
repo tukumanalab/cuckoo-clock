@@ -55,13 +55,30 @@ function outlinePoints(seq) {
 }
 
 // ── Three.js ─────────────────────────────────────────────
+// WebGL が使えない環境（Chrome のハードウェアアクセラレーション無効など）でも
+// エディタと STL/SVG/PDF 出力は動かす。ここで例外を投げるとモジュール全体の評価が
+// 止まり、以降のピアノロール構築もボタンのイベント登録も実行されなくなるため必ず捕まえる。
 const container = document.getElementById('preview-container');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(container.clientWidth, container.clientHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setClearColor(0xe8f0f8);
-container.appendChild(renderer.domElement);
+let renderer = null;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setClearColor(0xe8f0f8);
+  container.appendChild(renderer.domElement);
+} catch (e) {
+  console.warn('WebGL を初期化できないため 3D プレビューを無効にします:', e);
+  renderer = null;   // 生成後（setSize など）で落ちた場合も使わせない
+  const msg = document.createElement('p');
+  msg.className = 'preview-fallback';
+  msg.textContent = 'この環境では 3D プレビューを表示できません（WebGL が無効）。'
+    + 'メロディの編集と STL・SVG・PDF のダウンロードはそのまま使えます。';
+  container.appendChild(msg);
+  document.querySelector('.preview-hint')?.remove();   // 「ドラッグで回転」は無意味なので消す
+  container.style.marginBottom = '24px';               // hint 分の余白を肩代わり
+}
 
+// scene / camera / ライトは WebGL がなくても STL 書き出しに必要なので常に用意する
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(36, container.clientWidth / container.clientHeight, 0.1, 1000);
 camera.position.set(35, 42, -48);
@@ -78,13 +95,16 @@ const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
 rimLight.position.set(0, -30, -50);
 scene.add(rimLight);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.07;
-controls.target.set(0, 0, 0);
-controls.minDistance = 20;
-controls.maxDistance = 200;
-controls.update();
+let controls = null;
+if (renderer) {
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.target.set(0, 0, 0);
+  controls.minDistance = 20;
+  controls.maxDistance = 200;
+  controls.update();
+}
 
 let meshObj = null, edgeObj = null;
 
@@ -147,12 +167,14 @@ function buildGeometry() {
 }
 buildGeometry();
 
-window.addEventListener('resize', () => {
-  camera.aspect = container.clientWidth / container.clientHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(container.clientWidth, container.clientHeight);
-});
-(function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
+if (renderer) {
+  window.addEventListener('resize', () => {
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+  });
+  (function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
+}
 
 // ── STL generation ────────────────────────────────────────
 function generateSTL() {
