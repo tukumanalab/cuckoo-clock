@@ -15,7 +15,8 @@ const RADII = [
   15.625,  // 8: ド#  φ31.25mm
   15,      // 9: ド   φ30mm
 ];
-const HOLE_HALF = 5.25;
+const HOLE_HALF = 5.35; // original cams have 10.7mm holes
+const STL_HOLE_OFFSET = 0.1 // how much to enlarge the hole for printing
 const THICKNESS = 1.8;
 const SUB = 24;
 const BLEND = 0.25; // セクター境界の遷移半幅（セクター幅比）。境界の前後この範囲で半径をなだらかに変える
@@ -178,8 +179,15 @@ if (renderer) {
 
 // ── STL generation ────────────────────────────────────────
 function generateSTL() {
+  HOLE_HALF += STL_HOLE_OFFSET; // widen hole just for STL
+  buildGeometry(); // rebuild scene with bigger hole
   scene.updateMatrixWorld();
-  return new STLExporter().parse(scene, { binary: false });
+  const result = new STLExporter().parse(scene, { binary: false });
+
+  HOLE_HALF -= STL_HOLE_OFFSET; // restore original size
+  buildGeometry(); // rebuild scene back for the preview and other exports
+
+  return result;
 }
 
 // ── SVG generation ────────────────────────────────────────
